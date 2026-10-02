@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import logging
 import os
+from pathlib import Path
 import time
 from dataclasses import dataclass
 from typing import Callable, Iterable, Iterator, Protocol
@@ -810,49 +812,55 @@ def is_transient_ai_error(exc: Exception) -> bool:
     return classify_generation_error(exc) == TRANSIENT_SERVER_ERROR
 
 
+class _DuplicateGeminiKeyFilter(logging.Filter):
+    """Hide google-genai's "both keys are set" notice: the key is always passed explicitly."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "Both GOOGLE_API_KEY and GEMINI_API_KEY are set" not in record.getMessage()
+
+
+logging.getLogger("google_genai._api_client").addFilter(_DuplicateGeminiKeyFilter())
+
+
 @contextmanager
 def selected_api_environment(api_key: str | None, api_source: str | None) -> Iterator[None]:
-    original_gemini = os.environ.get("GEMINI_API_KEY")
-    original_google = os.environ.get("GOOGLE_API_KEY")
-    original_groq = os.environ.get("GROQ_API_KEY")
-    original_xai = os.environ.get("XAI_API_KEY")
-    original_openrouter = os.environ.get("OPENROUTER_API_KEY")
-    try:
-        if api_source == "GEMINI_API_KEY" and api_key:
-            os.environ["GEMINI_API_KEY"] = api_key
-            os.environ.pop("GOOGLE_API_KEY", None)
-        elif api_source == "GOOGLE_API_KEY" and api_key:
-            os.environ["GOOGLE_API_KEY"] = api_key
-            os.environ.pop("GEMINI_API_KEY", None)
-        elif api_source == "GROQ_API_KEY" and api_key:
-            os.environ["GROQ_API_KEY"] = api_key
-        elif api_source == "XAI_API_KEY" and api_key:
-            os.environ["XAI_API_KEY"] = api_key
-        elif api_source == "OPENROUTER_API_KEY" and api_key:
-            os.environ["OPENROUTER_API_KEY"] = api_key
-        yield
-    finally:
-        restore_environment_value("GEMINI_API_KEY", original_gemini)
-        restore_environment_value("GOOGLE_API_KEY", original_google)
-        restore_environment_value("GROQ_API_KEY", original_groq)
-        restore_environment_value("XAI_API_KEY", original_xai)
-        restore_environment_value("OPENROUTER_API_KEY", original_openrouter)
+    """Kept for call-site compatibility; it no longer touches ``os.environ``.
+
+    It used to rewrite and restore the provider key variables around each Gemini call so
+    the SDK would not see two keys. The process environment is shared by every thread, so
+    that raced with the file watcher and with other calls. Every client is now built with
+    its key passed explicitly, which the SDK prefers over the environment.
+    """
+    yield
+
+
+def dotenv_candidates() -> list[Path]:
+    """Files DevAgent may read provider keys from.
+
+    ``load_dotenv()`` with no argument searches upward from the installed package, which
+    is neither predictable nor something a project directory should be able to influence.
+    Only these two locations are read, and a variable already set in the environment
+    always wins.
+    """
+    candidates: list[Path] = []
+    explicit = os.environ.get("DEVAGENT_ENV_FILE")
+    if explicit:
+        candidates.append(Path(explicit).expanduser())
+    candidates.append(ConfigManager.config_dir() / ".env")
+    return candidates
 
 
 def load_dotenv_if_available() -> None:
     try:
         from dotenv import load_dotenv
-
-        load_dotenv()
     except Exception:
         return
-
-
-def restore_environment_value(name: str, value: str | None) -> None:
-    if value is None:
-        os.environ.pop(name, None)
-    else:
-        os.environ[name] = value
+    for candidate in dotenv_candidates():
+        try:
+            if candidate.is_file():
+                load_dotenv(candidate, override=False)
+        except Exception:
+            continue
 
 
 class GeminiAdapter:

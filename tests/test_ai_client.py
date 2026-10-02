@@ -93,22 +93,59 @@ def test_ai_client_lists_openrouter_models(monkeypatch) -> None:
     assert models[0].provider == "openrouter"
 
 
-def test_selected_api_environment_hides_the_other_google_key(monkeypatch) -> None:
+def test_selected_api_environment_never_touches_the_process_environment(monkeypatch) -> None:
+    # It used to hide the other Google key by rewriting os.environ, which raced with every
+    # other thread. The key is passed to the SDK explicitly instead.
     monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    before = dict(os.environ)
 
     with selected_api_environment("gemini-key", "GEMINI_API_KEY"):
-        assert os.environ.get("GEMINI_API_KEY") == "gemini-key"
-        assert "GOOGLE_API_KEY" not in os.environ
+        assert dict(os.environ) == before
 
-    assert os.environ.get("GOOGLE_API_KEY") == "google-key"
-    assert os.environ.get("GEMINI_API_KEY") == "gemini-key"
+    assert dict(os.environ) == before
 
 
-def test_ai_client_reuses_cached_gemini_client_and_keeps_env_silent(monkeypatch) -> None:
+def test_selected_api_environment_is_safe_across_threads(monkeypatch) -> None:
+    import threading
+
+    monkeypatch.setenv("GOOGLE_API_KEY", "google-key")
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    seen: list[tuple[str | None, str | None]] = []
+    barrier = threading.Barrier(8)
+
+    def worker() -> None:
+        barrier.wait()
+        for _ in range(200):
+            with selected_api_environment("gemini-key", "GEMINI_API_KEY"):
+                seen.append((os.environ.get("GEMINI_API_KEY"), os.environ.get("GOOGLE_API_KEY")))
+
+    threads = [threading.Thread(target=worker) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert set(seen) == {("gemini-key", "google-key")}
+
+
+def test_duplicate_gemini_key_notice_is_filtered_but_other_warnings_are_not() -> None:
+    import logging
+
+    duplicate_filter = next(f for f in logging.getLogger("google_genai._api_client").filters if type(f).__name__ == "_DuplicateGeminiKeyFilter")
+
+    def record(message: str) -> logging.LogRecord:
+        return logging.LogRecord("google_genai._api_client", logging.WARNING, __file__, 1, message, None, None)
+
+    assert not duplicate_filter.filter(record("Both GOOGLE_API_KEY and GEMINI_API_KEY are set. Using GOOGLE_API_KEY."))
+    assert duplicate_filter.filter(record("Quota nearly exhausted"))
+
+
+def test_ai_client_reuses_cached_gemini_client_and_passes_the_key_explicitly(monkeypatch) -> None:
     _clear_ai_caches()
     client_envs: list[tuple[str | None, str | None]] = []
     call_envs: list[tuple[str | None, str | None]] = []
+    explicit_keys: list[str | None] = []
 
     class FakeResponse:
         text = "ok"
@@ -124,6 +161,7 @@ def test_ai_client_reuses_cached_gemini_client_and_keeps_env_silent(monkeypatch)
 
     class FakeClient:
         def __init__(self, api_key=None):
+            explicit_keys.append(api_key)
             client_envs.append((os.environ.get("GEMINI_API_KEY"), os.environ.get("GOOGLE_API_KEY")))
             self.models = FakeModels()
 
@@ -139,8 +177,9 @@ def test_ai_client_reuses_cached_gemini_client_and_keeps_env_silent(monkeypatch)
     assert client.complete("hello") == "ok"
     assert client.complete("hello again") == "ok"
     assert client.embed(["one"]) == [[0.1, 0.2]]
-    assert client_envs == [("gemini-key", None)]
-    assert call_envs == [("gemini-key", None), ("gemini-key", None), ("gemini-key", None)]
+    assert explicit_keys == ["gemini-key"]
+    assert client_envs == [("gemini-key", "google-key")]
+    assert call_envs == [("gemini-key", "google-key")] * 3
 
 
 def test_ai_client_retries_transient_503_errors(monkeypatch) -> None:

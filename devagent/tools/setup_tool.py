@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -50,10 +51,10 @@ class SetupTool:
         install_deps: bool = False,
         open_code: bool = False,
     ) -> SetupResult:
-        clone_url = normalize_github_clone_url(repo_url)
+        clone_url = validate_github_clone_url(normalize_github_clone_url(repo_url))
         parent = target.expanduser().resolve() if target else Path.cwd()
         parent.mkdir(parents=True, exist_ok=True)
-        repo_name = clone_url.rstrip("/").removesuffix(".git").split("/")[-1]
+        repo_name = re.split(r"[/:]", clone_url.removesuffix(".git"))[-1]
         destination = parent / repo_name
         run(["git", "clone", clone_url, str(destination)], cwd=parent)
 
@@ -118,6 +119,11 @@ class SetupTool:
                 messages.append(f"Skipped initial commit: {exc}")
 
         final_name = repo_name or workspace.name
+        if not GITHUB_REPO_NAME_RE.match(final_name):
+            raise ValueError(
+                f"Invalid repository name {final_name!r}: use letters, digits, '.', '_' or '-' "
+                "(optionally OWNER/NAME), and do not start with '-'."
+            )
         visibility = "--private" if private else "--public"
         command = ["gh", "repo", "create", final_name, visibility, "--source", str(workspace), "--remote", "origin"]
         if push:
@@ -127,6 +133,28 @@ class SetupTool:
         if push:
             messages.append("Pushed local branch to GitHub.")
         return SetupResult(path=workspace, message="\n".join(messages))
+
+
+GITHUB_REPO_NAME_RE = re.compile(r"^(?![-.])[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?$")
+_GITHUB_CLONE_URL_RES = (
+    re.compile(r"^https://github\.com/(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?/?$"),
+    re.compile(r"^git@github\.com:(?P<owner>[A-Za-z0-9_.-]+)/(?P<repo>[A-Za-z0-9_.-]+?)(?:\.git)?$"),
+)
+
+
+def validate_github_clone_url(value: str) -> str:
+    """Accept only GitHub HTTPS/SSH clone URLs; anything else is passed to ``git clone`` by no one.
+
+    ``git clone`` also understands ``ext::<command>`` transports, ``file://`` paths and
+    arguments starting with ``-``. A pasted URL must not be able to reach any of those.
+    """
+    for pattern in _GITHUB_CLONE_URL_RES:
+        match = pattern.match(value)
+        if match and set(match.group("repo")) != {"."}:
+            return value
+    raise ValueError(
+        f"Unsupported clone URL {value!r}. Use https://github.com/OWNER/REPO or git@github.com:OWNER/REPO."
+    )
 
 
 def normalize_github_clone_url(value: str) -> str:
@@ -243,10 +271,21 @@ def open_in_vscode(path: Path) -> str:
     return "Requested VS Code open."
 
 
+JS_PACKAGE_MANAGERS = {"npm", "pnpm", "yarn"}
+# Dependency installs run third-party lifecycle scripts (preinstall/postinstall) by
+# default. Turn them off for the install DevAgent performs on a project it did not write.
+JS_INSTALL_NO_SCRIPTS_ENV = {"npm_config_ignore_scripts": "true", "YARN_ENABLE_SCRIPTS": "false"}
+
+
+def is_js_install(args: list[str]) -> bool:
+    return bool(args) and Path(args[0]).stem.lower() in JS_PACKAGE_MANAGERS and "install" in args[1:3]
+
+
 def run(args: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
     resolved_args = resolve_command(args)
+    kwargs: dict = {"env": {**os.environ, **JS_INSTALL_NO_SCRIPTS_ENV}} if is_js_install(args) else {}
     try:
-        result = subprocess.run(resolved_args, cwd=cwd, text=True, capture_output=True)
+        result = subprocess.run(resolved_args, cwd=cwd, text=True, capture_output=True, **kwargs)
     except FileNotFoundError as exc:
         if check:
             raise RuntimeError(f"Required command not found: {args[0]}") from exc
