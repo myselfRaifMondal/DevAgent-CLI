@@ -95,6 +95,7 @@ class RepoAgent:
             chunks=chunks,
             relevant_files=relevant_files,
             ai_issue=response.final_error if self.ai.available else ai_setup_hint(),
+            ai_configured=self.ai.available,
         )
         self.sessions.append_exchange(question, fallback)
         return fallback
@@ -226,10 +227,14 @@ def build_prompt(*, question: str, intent: str, queries: list[str], project, ses
     )
 
 
-def build_grounded_fallback(*, question: str, intent: str, project, session, chunks, relevant_files: list[str], ai_issue: str | None = None) -> str:
+def build_grounded_fallback(*, question: str, intent: str, project, session, chunks, relevant_files: list[str], ai_issue: str | None = None, ai_configured: bool = True) -> str:
     provider_label = AIClient.from_env().provider_label
+    if ai_configured:
+        why = f"{provider_label} could not finish the AI synthesis right now"
+    else:
+        why = "no AI provider is configured to write an answer"
     lines = [
-        f"I found grounded repo context for your {intent} question, but {provider_label} could not finish the AI synthesis right now.",
+        f"I found grounded repo context for your {intent} question, but {why}.",
         "",
         "What I found:",
         *(relevant_files or ["- No indexed chunks matched directly."]),
@@ -242,7 +247,11 @@ def build_grounded_fallback(*, question: str, intent: str, project, session, chu
     if session.summary:
         lines.extend(["", f"Conversation memory: {session.summary}"])
     if chunks:
-        lines.extend(["", "Best next step:", "Configure an AI provider key and rerun the question to get a synthesized answer over these exact files."])
+        if ai_configured:
+            next_step = "Rerun the question in a moment, or run `devagent ai status` to check the provider."
+        else:
+            next_step = "Set up a provider as described above, then rerun the question to get a synthesized answer over these exact files."
+        lines.extend(["", "Best next step:", next_step])
     else:
         lines.extend(["", "Best next step:", "Run `devagent index` and ask a more specific question about a file, route, module, or feature."])
     return "\n".join(lines)

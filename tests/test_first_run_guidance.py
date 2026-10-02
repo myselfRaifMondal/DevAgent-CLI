@@ -85,6 +85,29 @@ def test_chat_with_no_ai_but_a_match_explains_why_the_answer_is_not_ai_written(t
 
     assert "billing.py" in answer
     assert "Why the AI answer fell back: No AI provider is configured" in answer
+    assert "no AI provider is configured to write an answer" in answer
+    assert "could not finish the AI synthesis" not in answer
+    assert "Set up a provider as described above" in answer
+
+
+def test_a_configured_but_failing_provider_is_not_told_to_configure_a_key(tmp_path: Path, monkeypatch) -> None:
+    failing = SimpleNamespace(
+        available=True,
+        provider_label="Gemini",
+        embed=lambda texts: None,
+        generate=lambda *a, **k: SimpleNamespace(text=None, final_error="Gemini stayed busy.", succeeded=False),
+    )
+    monkeypatch.setattr("devagent.tools.ai.AIClient.from_env", classmethod(lambda cls: failing))
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    (workspace / "billing.py").write_text("def charge_customer(card):\n    return card\n", encoding="utf-8")
+
+    answer = RepoAgent(workspace).answer("Where is charge_customer?")
+
+    assert "Gemini could not finish the AI synthesis" in answer
+    assert "Gemini stayed busy." in answer
+    assert "Configure an AI provider key" not in answer
+    assert "devagent ai status" in answer
 
 
 def test_edit_without_ai_tells_you_how_to_configure_it(tmp_path: Path, monkeypatch) -> None:
