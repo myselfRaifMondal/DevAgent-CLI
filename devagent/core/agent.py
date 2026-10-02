@@ -5,6 +5,7 @@ from pathlib import Path
 
 from devagent.context.indexer import CodeIndexer
 from devagent.context.retriever import Retriever
+from devagent.context.secrets import redact_secrets
 from devagent.core.project import detect_project
 from devagent.core.session_store import SessionStore
 from devagent.core.structured_answers import answer_structured_question
@@ -169,7 +170,7 @@ def render_chunk(chunk) -> str:
     prefix = f"File: {chunk.path}\nLines: {chunk.start_line}-{chunk.end_line}"
     if metadata_block:
         prefix += f"\n{metadata_block}"
-    return f"{prefix}\n{chunk.text}"
+    return f"{prefix}\n{redact_secrets(chunk.text)}"
 
 
 def summarize_files(chunks) -> list[str]:

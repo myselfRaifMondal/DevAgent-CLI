@@ -7,6 +7,7 @@ from pathlib import Path
 
 from devagent.context.indexer import CodeIndexer
 from devagent.context.retriever import Retriever
+from devagent.context.secrets import redact_secrets
 from devagent.tools.ai import AIClient, GenerationProgressCallback
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
@@ -57,6 +58,18 @@ class PatchApplyError(RuntimeError):
     pass
 
 
+class UnsafePatchPathError(PatchApplyError):
+    """A diff names a file outside the workspace or inside a protected directory.
+
+    Never retried or "repaired": a model that produced such a path is either wrong
+    or being steered by untrusted text in the indexed repository.
+    """
+
+
+PROTECTED_DIR_NAMES = frozenset({".git", ".devagent"})
+WINDOWS_DRIVE_RE = re.compile(r"^[A-Za-z]:")
+
+
 class EditAgent:
     def __init__(self, workspace: Path):
         self.workspace = workspace.expanduser().resolve()
@@ -71,7 +84,7 @@ class EditAgent:
         index = CodeIndexer(self.workspace).load_or_build()
         chunks = Retriever(index).search(instruction, limit=8)
         context = "\n\n".join(
-            f"File: {chunk.path}\nLines: {chunk.start_line}-{chunk.end_line}\n{chunk.text}" for chunk in chunks
+            f"File: {chunk.path}\nLines: {chunk.start_line}-{chunk.end_line}\n{redact_secrets(chunk.text)}" for chunk in chunks
         )
         if not self.ai.available:
             files = "\n".join(f"- {chunk.path}:{chunk.start_line}-{chunk.end_line}" for chunk in chunks)
@@ -119,6 +132,8 @@ class EditAgent:
             try:
                 self._apply_once(current_diff)
                 return
+            except UnsafePatchPathError:
+                raise
             except RuntimeError as exc:
                 failure_messages.append(str(exc))
                 if repair_pass >= 2 or not self.ai.available:
@@ -144,6 +159,7 @@ class EditAgent:
         raise RuntimeError(summary)
 
     def _apply_once(self, diff: str) -> None:
+        validate_patch_paths(diff, self.workspace)
         diff_bytes = diff.encode("utf-8")
         check_result = self._run_git_apply(["--check"], diff_bytes)
         apply_result = self._run_git_apply(["--recount", "--whitespace=fix"], diff_bytes)
@@ -247,6 +263,69 @@ def format_git_apply_error(label: str, result: subprocess.CompletedProcess[bytes
     return f"{label} failed: {message}"
 
 
+def collect_patch_paths(diff: str) -> list[str]:
+    """Every file path a diff names, as git or the fallback applier could read it.
+
+    Deliberately independent of ``parse_unified_diff``: a diff our parser rejects can
+    still be accepted by ``git apply``, so path validation must not depend on the
+    parser succeeding.
+    """
+    lines = diff.splitlines()
+    paths: list[str] = []
+    for index, line in enumerate(lines):
+        if line.startswith("diff --git "):
+            match = re.match(r"^diff --git a/(.+) b/(.+)$", line)
+            if not match:
+                raise UnsafePatchPathError(f"Unparseable diff header: {line[:80]!r}")
+            paths.extend(match.groups())
+        elif line.startswith(("rename from ", "rename to ", "copy from ", "copy to ")):
+            paths.append(line.split(" ", 2)[2])
+        elif line.startswith("--- ") and index + 1 < len(lines) and lines[index + 1].startswith("+++ "):
+            paths.append(line[4:])
+            paths.append(lines[index + 1][4:])
+    return [path.split("\t", 1)[0].strip() for path in paths]
+
+
+def validate_patch_target(raw_path: str, workspace: Path) -> None:
+    """Reject paths that escape ``workspace`` or touch protected directories."""
+    value = raw_path.split("\t", 1)[0].strip()
+    if value == "/dev/null":
+        return
+    if not value:
+        raise UnsafePatchPathError("The diff names an empty file path.")
+    if "\x00" in value or value.startswith('"'):
+        raise UnsafePatchPathError(f"Unsupported file path in diff: {value[:80]!r}")
+
+    normalized = value.replace("\\", "/")
+    # Check the path as written, as the fallback applier reads it (a/ b/ stripped), and
+    # as ``git apply -p1`` reads it (first component stripped).
+    candidates = {normalized, parse_patch_path(normalized) or ""}
+    if "/" in normalized:
+        candidates.add(normalized.split("/", 1)[1])
+
+    root = workspace.expanduser().resolve()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        if candidate.startswith("/") or WINDOWS_DRIVE_RE.match(candidate):
+            raise UnsafePatchPathError(f"Refusing absolute path in diff: {value}")
+        parts = [part for part in candidate.split("/") if part not in ("", ".")]
+        if ".." in parts:
+            raise UnsafePatchPathError(f"Refusing path that leaves the workspace: {value}")
+        if any(part.lower() in PROTECTED_DIR_NAMES for part in parts):
+            raise UnsafePatchPathError(f"Refusing to modify protected path: {value}")
+        # resolve() follows symlinks, so a link inside the workspace pointing out of it
+        # is caught here even though the string itself looks innocent.
+        resolved = (root / candidate).resolve()
+        if resolved != root and root not in resolved.parents:
+            raise UnsafePatchPathError(f"Refusing path that resolves outside the workspace: {value}")
+
+
+def validate_patch_paths(diff: str, workspace: Path) -> None:
+    for raw_path in collect_patch_paths(diff):
+        validate_patch_target(raw_path, workspace)
+
+
 def apply_unified_diff_fallback(diff: str, workspace: Path) -> None:
     patches = parse_unified_diff(diff)
     if not patches:
@@ -255,6 +334,7 @@ def apply_unified_diff_fallback(diff: str, workspace: Path) -> None:
     staged_updates: dict[Path, str] = {}
     for patch in patches:
         target_rel = patch_target_path(patch)
+        validate_patch_target(target_rel, workspace)
         target_path = workspace / target_rel
 
         if patch.old_path is not None and patch.new_path is not None and patch.old_path != patch.new_path:
