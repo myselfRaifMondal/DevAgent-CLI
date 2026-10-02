@@ -70,7 +70,10 @@ class Retriever:
         scored: dict[tuple[str, int, int], float] = {}
         for record in self.index.records:
             text_tokens = tokenize(record.lexical_text())
-            overlap = sum(min(text_tokens[token], weight) for token, weight in query_tokens.items())
+            overlap = sum(
+                min(text_tokens[token], weight) if token in text_tokens else prefix_match_credit(token, text_tokens)
+                for token, weight in query_tokens.items()
+            )
             score = overlap / max(len(query_tokens), 1)
             if score:
                 scored[(record.path, record.start_line, record.end_line)] = score
@@ -154,6 +157,26 @@ class Retriever:
 class SearchHit:
     record: CodeChunk
     score: float
+
+
+PREFIX_MATCH_MIN_LENGTH = 4
+PREFIX_MATCH_CREDIT = 0.5
+
+
+def prefix_match_credit(query_token: str, text_tokens: Counter[str]) -> float:
+    """Half credit when a query word and a code word share a prefix ("authentication" ~ "auth").
+
+    Only words of at least four letters take part, so "is" or "id" never match anything, and
+    an exact match always scores higher than a prefix match.
+    """
+    if len(query_token) < PREFIX_MATCH_MIN_LENGTH:
+        return 0.0
+    for token in text_tokens:
+        if len(token) < PREFIX_MATCH_MIN_LENGTH:
+            continue
+        if token.startswith(query_token) or query_token.startswith(token):
+            return PREFIX_MATCH_CREDIT
+    return 0.0
 
 
 def tokenize(text: str) -> Counter[str]:

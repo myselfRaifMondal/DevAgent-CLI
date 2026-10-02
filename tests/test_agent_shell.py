@@ -43,6 +43,9 @@ class FailingAI:
         self.available = True
         self.provider_label = "Gemini"
 
+    def embed(self, texts):
+        return None
+
     def generate(self, prompt: str, *, deep: bool = False, system_instruction: str | None = None, progress_callback=None) -> GenerationResult:
         return GenerationResult(
             text=None,
@@ -727,9 +730,10 @@ def test_workspace_status_with_missing_bound_workspace_shows_actionable_error(mo
 
     result = runner.invoke(app, ["workspace", "status"])
 
+    # Typer 0.27 / Click 8.2 report usage errors on stderr; `output` has both streams.
     assert result.exit_code != 0
-    assert "The saved workspace path no longer exists" in result.stdout
-    assert "devagent workspace bind <path>" in result.stdout
+    assert "The saved workspace path no longer exists" in result.output
+    assert "devagent workspace bind <path>" in result.output
 
 
 def test_ai_status_still_works_when_saved_workspace_path_is_missing(monkeypatch, tmp_path: Path) -> None:

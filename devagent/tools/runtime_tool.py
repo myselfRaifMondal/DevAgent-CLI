@@ -14,6 +14,7 @@ from typing import Any
 
 from devagent.config.settings import ConfigManager
 from devagent.context.scanner import IGNORED_DIRS
+from devagent.core import host
 from devagent.tools.setup_tool import is_python_venv_dir, preferred_python_venv_dir, python_venv_executable
 
 
@@ -186,7 +187,7 @@ class RunTool:
         return True
 
     def launch(self, specs: list[LaunchSpec], *, open_browser: bool = False) -> None:
-        if os.name == "nt":
+        if host.is_windows():
             for spec in specs:
                 launcher = write_windows_launcher(self.workspace, spec)
                 subprocess.Popen(
@@ -322,7 +323,7 @@ def package_manager_command(package_manager: str, script_name: str) -> tuple[lis
 
 
 def build_manual_launch_spec(phrase: str, cwd: Path, command_text: str) -> LaunchSpec:
-    command = shlex.split(command_text, posix=os.name != "nt")
+    command = shlex.split(command_text, posix=not host.is_windows())
     if not command:
         raise RuntimeError("The custom launch command was empty.")
 
@@ -448,7 +449,7 @@ def infer_browser_url_from_manual_command(command_text: str) -> str | None:
     if lowered.startswith(("npm", "yarn", "pnpm")):
         return infer_browser_url_from_script("dev" if " dev" in lowered else "start", lowered)
     if lowered.startswith(("python", "py", "uvicorn", "flask", "streamlit")):
-        return infer_browser_url_from_python_command(shlex.split(command_text, posix=os.name != "nt"))
+        return infer_browser_url_from_python_command(shlex.split(command_text, posix=not host.is_windows()))
     return None
 
 

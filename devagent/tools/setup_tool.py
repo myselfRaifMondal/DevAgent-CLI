@@ -9,6 +9,7 @@ from shutil import which
 from urllib.parse import urlparse
 
 from devagent.context.scanner import IGNORED_DIRS
+from devagent.core import host
 from devagent.core.project import detect_project
 from devagent.tools.git_tool import GitTool
 
@@ -220,7 +221,7 @@ def preferred_python_venv_dir(path: Path) -> Path:
 
 
 def python_venv_executable(venv_dir: Path) -> Path:
-    if os.name == "nt":
+    if host.is_windows():
         return venv_dir / "Scripts" / "python.exe"
     return venv_dir / "bin" / "python"
 

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import devagent.tools.runtime_tool as runtime_tool_module
+from devagent.core import host
 from devagent.tools.runtime_tool import RunTool, build_windows_terminal_command, write_windows_launcher
 
 
@@ -44,7 +45,8 @@ def test_detect_launch_specs_reuses_existing_named_venv(tmp_path: Path) -> None:
     assert python_spec.bootstrap_commands == ()
 
 
-def test_build_windows_terminal_command_activates_venv(tmp_path: Path) -> None:
+def test_build_windows_terminal_command_activates_venv(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(host, "is_windows", lambda: True)
     backend = tmp_path / "backend"
     backend.mkdir()
     (backend / "requirements.txt").write_text("fastapi\n", encoding="utf-8")
@@ -59,6 +61,7 @@ def test_build_windows_terminal_command_activates_venv(tmp_path: Path) -> None:
 
 
 def test_write_windows_launcher_uses_batch_file_for_bootstrap(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(host, "is_windows", lambda: True)
     monkeypatch.setenv("DEVAGENT_CONFIG_DIR", str(tmp_path / "config-home"))
     backend = tmp_path / "backend"
     backend.mkdir()
@@ -79,7 +82,7 @@ def test_write_windows_launcher_uses_batch_file_for_bootstrap(tmp_path: Path, mo
 
 
 def test_launch_opens_browser_for_detected_frontend(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(runtime_tool_module.os, "name", "nt")
+    monkeypatch.setattr(host, "is_windows", lambda: True)
     opened_urls: list[str] = []
     spawned: list[list[str]] = []
 
@@ -146,7 +149,7 @@ def test_saved_profiles_match_normalized_phrase(tmp_path: Path, monkeypatch) -> 
 
 def test_launch_saved_uses_profile_browser_preference(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("DEVAGENT_CONFIG_DIR", str(tmp_path / "config-home"))
-    monkeypatch.setattr(runtime_tool_module.os, "name", "nt")
+    monkeypatch.setattr(host, "is_windows", lambda: True)
     opened_urls: list[str] = []
 
     class DummyProcess:

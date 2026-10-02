@@ -372,6 +372,9 @@ class FailedGenerationAI:
     def __init__(self) -> None:
         self.available = True
 
+    def embed(self, texts):
+        return None
+
     def generate(self, prompt: str, *, deep: bool = False, system_instruction: str | None = None, progress_callback=None):
         return ai_module.GenerationResult(
             text=None,

@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
+from devagent.config.settings import ConfigManager
+
 IGNORED_DIRS = {
     ".git",
     ".devagent",
@@ -46,11 +48,16 @@ TEXT_EXTENSIONS = {
 
 def iter_source_files(root: Path) -> Iterable[Path]:
     resolved = root.expanduser().resolve()
+    # DevAgent's own state (index cache, saved profiles) can live inside the project when
+    # DEVAGENT_CONFIG_DIR points there. Indexing it would index the index.
+    config_dir = ConfigManager.config_dir()
     for path in sorted(resolved.rglob("*")):
         if not path.is_file():
             continue
         relative = path.relative_to(resolved)
         if any(part in IGNORED_DIRS for part in relative.parts):
+            continue
+        if config_dir == path or config_dir in path.resolve().parents:
             continue
         if path.name.endswith(".env.example") or path.suffix.lower() in TEXT_EXTENSIONS:
             yield path
