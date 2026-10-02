@@ -7,6 +7,7 @@ from pathlib import Path
 
 from devagent.config.settings import ConfigManager
 from devagent.context.scanner import iter_source_files, read_text_safely
+from devagent.context.secrets import is_sensitive_path, redact_secrets
 from devagent.tools.ai import AIClient
 
 
@@ -56,11 +57,13 @@ class CodeIndexer:
         source_state = self.current_source_state()
         chunks: list[CodeChunk] = []
         for state in source_state:
+            if is_sensitive_path(state.path):
+                continue
             path = self.root / state.path
             text = read_text_safely(path)
             if not text:
                 continue
-            chunks.extend(self._chunk_file(path, text))
+            chunks.extend(self._chunk_file(path, redact_secrets(text)))
 
         embeddings = self.ai.embed([chunk.text for chunk in chunks])
         if embeddings and len(embeddings) == len(chunks):
@@ -92,7 +95,8 @@ class CodeIndexer:
 
     def load(self) -> CodeIndex:
         data = json.loads(self.index_file.read_text(encoding="utf-8"))
-        records = [CodeChunk(**item) for item in data.get("records", [])]
+        # Indexes written before secret filtering existed may still hold sensitive files.
+        records = [CodeChunk(**item) for item in data.get("records", []) if not is_sensitive_path(item.get("path", ""))]
         source_state = [SourceFileState(**item) for item in data.get("source_state", [])] or None
         return CodeIndex(root=self.root, records=records, source_state=source_state)
 
