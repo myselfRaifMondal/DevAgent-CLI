@@ -4,7 +4,7 @@ import locale
 import re
 import subprocess
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from devagent.tools.ai import AIClient
@@ -878,7 +878,6 @@ def build_commit_body(analysis: ChangeAnalysis) -> str:
 
 
 def derive_focus_topics(files: tuple[str, ...], diff: str, symbols: tuple[str, ...]) -> tuple[str, ...]:
-    lowered_files = " ".join(files).lower()
     lowered_diff = diff.lower()
     token_counts: Counter[str] = Counter()
     for file in files:
@@ -1219,10 +1218,10 @@ def build_commit_prompt(analysis: ChangeAnalysis, fallback: CommitSuggestion, *,
         f"Fallback subject: {fallback.subject}\n"
         f"Fallback body:\n{fallback.body or '(none)'}\n\n"
         f"Changed files:\n- " + "\n- ".join(analysis.files or ("none",)) + "\n\n"
-        f"Focus topics:\n- " + "\n- ".join(analysis.focus_topics or ("project changes",)) + "\n\n"
-        f"Key symbols:\n- " + "\n- ".join(analysis.symbols or ("none",)) + "\n\n"
-        f"Change summary:\n- " + "\n- ".join(analysis.change_summary or ("none",)) + "\n\n"
-        f"Impact summary:\n- " + "\n- ".join(analysis.impact_summary or ("none",)) + "\n\n"
+        "Focus topics:\n- " + "\n- ".join(analysis.focus_topics or ("project changes",)) + "\n\n"
+        "Key symbols:\n- " + "\n- ".join(analysis.symbols or ("none",)) + "\n\n"
+        "Change summary:\n- " + "\n- ".join(analysis.change_summary or ("none",)) + "\n\n"
+        "Impact summary:\n- " + "\n- ".join(analysis.impact_summary or ("none",)) + "\n\n"
         "Diff excerpt:\n"
         f"{truncate_text(analysis.diff or analysis.staged_diff, 5000)}"
     )

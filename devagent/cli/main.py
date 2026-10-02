@@ -7,7 +7,7 @@ from typing import Optional
 import typer
 from rich.prompt import Confirm, Prompt
 
-from devagent.cli.prompts import MenuChoice, can_use_arrow_menu, choose_directory, choose_menu_action
+from devagent.cli.prompts import MenuChoice, can_use_arrow_menu, choose_directory
 from devagent.cli.renderers import (
     ai_models_collection_renderable,
     ai_selection_renderable,
@@ -23,7 +23,7 @@ from devagent.cli.renderers import (
     run_launch_message,
     workspace_status_table,
 )
-from devagent.cli.ui import app_panel, app_table, console, hero_panel, render_chat_markdown, status_badge, styled_path, toned_message
+from devagent.cli.ui import app_panel, app_table, console, hero_panel, render_chat_markdown, toned_message
 from devagent.config.settings import ConfigManager
 from devagent.core.actions import DevAgentActions, bind_workspace_action, snapshot_workspace
 from devagent.core.shell import AgentShell, git_menu_choices, interactive_terminal

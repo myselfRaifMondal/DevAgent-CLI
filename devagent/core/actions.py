@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable
 
 from devagent.config.settings import AISettings, ConfigManager, ProviderModelConfig
 from devagent.context.indexer import CodeIndexer
@@ -12,7 +12,6 @@ from devagent.tools.ai import AIClient, AIStatusSnapshot, ProviderModelListing
 from devagent.tools.edit_tool import EditAgent, EditProposal
 from devagent.tools.git_tool import (
     CommitSuggestion,
-    GitError,
     GitRemote,
     GitTool,
     PullOptions,

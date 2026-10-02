@@ -24,7 +24,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.2.0"
+  "pytest>=8.2.0",
+  "ruff>=0.6.0"
 ]
 
 [project.scripts]
@@ -36,3 +37,11 @@ pythonpath = ["."]
 
 [tool.hatch.build.targets.wheel]
 packages = ["devagent"]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+# Syntax errors and Pyflakes: unused imports/variables, undefined names, redefinitions.
+select = ["E9", "F"]

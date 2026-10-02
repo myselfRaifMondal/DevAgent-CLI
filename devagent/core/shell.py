@@ -4,7 +4,6 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from rich.console import Group, RenderableType
 from rich.prompt import Confirm, Prompt
@@ -18,7 +17,6 @@ from devagent.cli.renderers import (
     git_pull_summary_renderable,
     git_push_summary_renderable,
     git_remotes_renderable,
-    insight_lines,
     insights_renderable,
     merge_conflicts_renderable,
     package_lines,
@@ -29,7 +27,7 @@ from devagent.cli.renderers import (
     workspace_status_table,
 )
 from devagent.cli.ui import app_panel, console, hero_panel, render_chat_markdown
-from devagent.core.actions import AISelectionResult, DevAgentActions, PullOutcome, PullRequestPreview, PushOutcome, RunProfile, RunLaunchResult, WorkspaceSnapshot
+from devagent.core.actions import AISelectionResult, DevAgentActions, PullOutcome, PullRequestPreview, PushOutcome, RunProfile, RunLaunchResult
 from devagent.tools.git_tool import GitError, GitRemote
 
 

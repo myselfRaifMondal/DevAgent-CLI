@@ -43,9 +43,6 @@ class FailingAI:
         self.available = True
         self.provider_label = "Gemini"
 
-    def embed(self, texts):
-        return None
-
     def generate(self, prompt: str, *, deep: bool = False, system_instruction: str | None = None, progress_callback=None) -> GenerationResult:
         return GenerationResult(
             text=None,
@@ -136,7 +133,7 @@ def test_shell_routes_saved_phrase_runtime_and_chat(tmp_path: Path, monkeypatch)
 
     shell = AgentShell(workspace)
     shell.repo_agent = FakeRepoAgent()
-    saved_profile = shell.run_tool.save_detected_profile("Start I Command You", open_browser=True)
+    shell.run_tool.save_detected_profile("Start I Command You", open_browser=True)
 
     launched: list[tuple[str, bool | None]] = []
     shell.run_tool.launch_profile = lambda profile, open_browser=None: launched.append((profile.phrase, open_browser)) or profile.specs

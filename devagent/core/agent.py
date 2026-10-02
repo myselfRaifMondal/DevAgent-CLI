@@ -207,7 +207,7 @@ def build_prompt(*, question: str, intent: str, queries: list[str], project, ses
         f"Conversation summary:\n{summary}\n\n"
         f"Recent turns:\n{history_block}\n\n"
         f"Expanded retrieval queries:\n- " + "\n- ".join(queries) + "\n\n"
-        f"Most relevant files:\n" + ("\n".join(relevant_files) if relevant_files else "- none") + "\n\n"
+        "Most relevant files:\n" + ("\n".join(relevant_files) if relevant_files else "- none") + "\n\n"
         "When you answer:\n"
         "- Explain what you found before you generalize.\n"
         "- Cite relevant files with line references like path:start-end.\n"
