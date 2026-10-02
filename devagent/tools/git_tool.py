@@ -68,6 +68,40 @@ class GitError(RuntimeError):
     pass
 
 
+_REF_FORBIDDEN_CHARS = re.compile(r"[\x00-\x20\x7f~^:?*\[\\]")
+_REPO_SLUG_RE = re.compile(r"^(?!-)[A-Za-z0-9_.-]+/(?!-)[A-Za-z0-9_.-]+$")
+
+
+def validate_ref_name(name: str, *, kind: str = "branch") -> str:
+    """Return ``name`` if it is safe to place on a git command line, else raise GitError.
+
+    User-typed branch and remote names end up as positional git arguments, so a value
+    such as ``--orphan`` or ``--upload-pack=...`` would be read as an option. Reject
+    those, then apply git's own ref-format rules on top.
+    """
+    if not name or not name.strip():
+        raise GitError(f"The {kind} name cannot be empty.")
+    if name.startswith("-"):
+        raise GitError(f"Invalid {kind} name {name!r}: it cannot start with '-'.")
+    if (
+        _REF_FORBIDDEN_CHARS.search(name)
+        or ".." in name
+        or "@{" in name
+        or "//" in name
+        or name.startswith(("/", "."))
+        or name.endswith(("/", ".", ".lock"))
+        or name == "@"
+    ):
+        raise GitError(f"Invalid {kind} name {name!r}.")
+    return name
+
+
+def validate_repo_slug(value: str) -> str:
+    if not _REPO_SLUG_RE.match(value):
+        raise GitError(f"Invalid repository {value!r}; expected OWNER/REPO.")
+    return value
+
+
 @dataclass(frozen=True)
 class GitRemote:
     name: str
@@ -258,6 +292,8 @@ class GitTool:
         return any(item.name == remote for item in self.remotes())
 
     def remote_tracking_ref_exists(self, remote: str, branch: str) -> bool:
+        validate_ref_name(remote, kind="remote")
+        validate_ref_name(branch)
         result = self._run(["git", "show-ref", "--verify", f"refs/remotes/{remote}/{branch}"], check=False)
         return result.returncode == 0
 
@@ -303,6 +339,9 @@ class GitTool:
             return 0, 0
 
     def resolve_base_ref(self, base_branch: str, remote: str | None = None) -> str | None:
+        validate_ref_name(base_branch, kind="base branch")
+        if remote:
+            validate_ref_name(remote, kind="remote")
         candidates = [base_branch]
         if remote:
             candidates.append(f"{remote}/{base_branch}")
@@ -346,10 +385,13 @@ class GitTool:
         return result.stdout.strip() or "Clean working tree."
 
     def create_branch(self, name: str) -> None:
+        validate_ref_name(name)
         self._run(["git", "checkout", "-b", name])
 
     def switch_branch(self, name: str) -> None:
-        self._run(["git", "checkout", name])
+        validate_ref_name(name)
+        # Trailing "--" makes git treat the name as a branch, never as a file path.
+        self._run(["git", "checkout", name, "--"])
 
     def add_all(self) -> None:
         self._run(["git", "add", "."])
@@ -363,6 +405,8 @@ class GitTool:
         )
         if not plan.branch:
             raise GitError("Could not determine which branch to pull.")
+        validate_ref_name(plan.remote, kind="remote")
+        validate_ref_name(plan.branch)
         args = ["git", "pull", plan.remote, plan.branch]
         if plan.rebase:
             args.insert(2, "--rebase")
@@ -412,6 +456,9 @@ class GitTool:
             set_upstream=set_upstream if tracked is None else False,
             force_with_lease=force_with_lease,
         )
+        validate_ref_name(plan.remote, kind="remote")
+        validate_ref_name(plan.local_branch)
+        validate_ref_name(plan.remote_branch)
         args = ["git", "push"]
         if plan.set_upstream:
             args.append("-u")
@@ -650,6 +697,11 @@ class GitTool:
             title=title,
             body=body,
         )
+        validate_ref_name(options.base_branch, kind="base branch")
+        validate_ref_name(options.head_branch, kind="head branch")
+        for repo in (options.base_repo, options.head_repo):
+            if repo:
+                validate_repo_slug(repo)
         preview = self.build_pr_preview(options)
         args = ["gh", "pr", "create", "--base", options.base_branch, "--title", preview.subject, "--body", preview.body]
         if options.base_repo:

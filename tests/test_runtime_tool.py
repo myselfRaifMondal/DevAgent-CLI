@@ -100,7 +100,7 @@ def test_launch_opens_browser_for_detected_frontend(tmp_path: Path, monkeypatch)
     (tmp_path / "frontend").mkdir()
     (tmp_path / "frontend" / "package.json").write_text('{"scripts": {"dev": "vite --port 3001"}}', encoding="utf-8")
 
-    specs = RunTool(tmp_path).launch_detected(open_browser=True)
+    specs = RunTool(tmp_path, approver=lambda lines: True).launch_detected(open_browser=True)
 
     assert specs[0].browser_url == "http://localhost:3001"
     assert opened_urls == ["http://localhost:3001"]
@@ -164,7 +164,7 @@ def test_launch_saved_uses_profile_browser_preference(tmp_path: Path, monkeypatc
     (workspace / "frontend").mkdir()
     (workspace / "frontend" / "package.json").write_text('{"scripts": {"dev": "vite --port 4173"}}', encoding="utf-8")
 
-    tool = RunTool(workspace)
+    tool = RunTool(workspace, approver=lambda lines: True)
     tool.save_detected_profile("Start the site", open_browser=True)
     tool.launch_saved("start the site")
 

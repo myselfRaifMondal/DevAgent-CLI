@@ -200,11 +200,17 @@ For OpenRouter, use `OPENROUTER_MODEL_FAST`, `OPENROUTER_MODEL`, and
 
 ### Simplest practical setup
 
-Create a `.env` file from the example:
+Create a `.env` file from the example and save it in DevAgent's config folder
+(`%USERPROFILE%\.devagent\.env` on Windows, `~/.devagent/.env` elsewhere):
 
 ```cmd
-copy .env.example .env
+mkdir "%USERPROFILE%\.devagent"
+copy .env.example "%USERPROFILE%\.devagent\.env"
 ```
+
+To keep the file somewhere else, point `DEVAGENT_ENV_FILE` at it. DevAgent reads
+only these two locations. It does not read a `.env` from the project you are
+working in, and a variable already set in your environment always wins.
 
 Then set at least:
 
@@ -214,6 +220,18 @@ GEMINI_API_KEY=your_key_here
 
 If you only have a Gemini key, DevAgent will still work fine and will only use
 Gemini.
+
+### What DevAgent will and will not run on its own
+
+- `devagent run start` shows the exact commands a project defines and asks
+  before running them. The approval is remembered for those commands and for
+  the current `package.json`, lockfiles, `pyproject.toml` and
+  `requirements.txt`; if any of them change, it asks again. In a
+  non-interactive shell it refuses instead of running.
+- `devagent setup clone --install-deps` installs npm, pnpm and yarn packages
+  with lifecycle scripts turned off. Run the install yourself afterwards if a
+  project needs its `postinstall` step.
+- `devagent setup clone` accepts GitHub HTTPS and SSH URLs only.
 
 ### Choosing provider and models from DevAgent
 

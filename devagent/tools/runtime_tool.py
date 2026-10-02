@@ -14,6 +14,7 @@ from typing import Any
 from devagent.config.settings import ConfigManager
 from devagent.context.scanner import IGNORED_DIRS
 from devagent.core import host
+from devagent.core.trust import Approver, require_launch_approval
 from devagent.tools.setup_tool import is_python_venv_dir, preferred_python_venv_dir, python_venv_executable
 
 
@@ -99,8 +100,9 @@ class RunProfile:
 
 
 class RunTool:
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, *, approver: Approver | None = None):
         self.workspace = workspace.expanduser().resolve()
+        self.approver = approver
 
     def detect_launch_specs(self) -> list[LaunchSpec]:
         specs: list[LaunchSpec] = []
@@ -186,6 +188,7 @@ class RunTool:
         return True
 
     def launch(self, specs: list[LaunchSpec], *, open_browser: bool = False) -> None:
+        require_launch_approval(self.workspace, specs, self.approver)
         if host.is_windows():
             for spec in specs:
                 launcher = write_windows_launcher(self.workspace, spec)
