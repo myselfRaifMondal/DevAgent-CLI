@@ -54,6 +54,13 @@ def test_fallback_refuses_parent_directory_traversal(tmp_path: Path, path: str) 
     assert not (tmp_path / "escape.txt").exists()
 
 
+def test_dot_dot_is_refused_even_when_it_stays_inside_the_workspace(tmp_path: Path) -> None:
+    # Resolves to <workspace>/README.md, so only an explicit ".." rule rejects it: the
+    # string is ambiguous between git and the fallback applier and has no honest use.
+    with pytest.raises(UnsafePatchPathError):
+        validate_patch_paths(NEW_FILE_TEMPLATE.format(path="b/sub/../README.md"), tmp_path)
+
+
 def test_fallback_refuses_absolute_path(tmp_path: Path) -> None:
     workspace = _git_workspace(tmp_path)
     outside = tmp_path / "absolute.txt"
@@ -156,7 +163,7 @@ def test_apply_does_not_ask_the_model_to_repair_an_unsafe_diff(tmp_path: Path, m
     assert repair_calls == []
 
 
-def test_apply_revalidates_a_repaired_diff(tmp_path: Path, monkeypatch) -> None:
+def test_a_repaired_diff_is_validated_before_it_is_applied(tmp_path: Path, monkeypatch) -> None:
     workspace = _git_workspace(tmp_path)
     _reject_git_apply(monkeypatch)
     agent = EditAgent(workspace)

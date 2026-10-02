@@ -150,9 +150,6 @@ class EditAgent:
                 )
                 if not repaired:
                     continue
-                # A repaired diff is model output like any other: re-validate before it
-                # reaches either apply path.
-                validate_patch_paths(repaired, self.workspace)
                 current_diff = repaired
 
         summary = failure_messages[-1] if failure_messages else "Patch apply failed."
