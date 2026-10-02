@@ -21,6 +21,14 @@ HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}\b")
 ESCAPE = re.compile(r"\x1b\[([0-9;]*)m")
 
 
+def _data_table():
+    table = ui.app_table("Table")
+    table.add_column("Name")
+    table.add_column("Value")
+    table.add_row("alpha", "1")
+    return table
+
+
 def _scenes():
     snapshot = WorkspaceSnapshot(
         project=ProjectInfo(path=Path("/work/acme"), project_types=["python"], package_files=["pyproject.toml"], file_tree=[]),
@@ -43,7 +51,7 @@ def _scenes():
     return [
         ui.hero_panel("Agent Shell", "subtitle"),
         ui.app_panel("body", "Title", tone="warning"),
-        ui.app_table("Table"),
+        _data_table(),
         workspace_status_table(snapshot),
         ai_status_renderable(status),
         pr_preview_renderable(preview),
