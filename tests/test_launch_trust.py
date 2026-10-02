@@ -1,6 +1,6 @@
 import json
 import stat
-import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,8 +19,9 @@ def _isolated_config(tmp_path: Path, monkeypatch) -> None:
 @pytest.fixture
 def launched(monkeypatch) -> list[list[str]]:
     calls: list[list[str]] = []
+    # No platform override: on Windows the recorded command is the cmd.exe launcher, which is fine
+    # because these tests only count launches.
     monkeypatch.setattr(runtime_module.subprocess, "Popen", lambda command, cwd=None, **kw: calls.append(list(command)))
-    monkeypatch.setattr(runtime_module.os, "name", "posix")
     return calls
 
 
@@ -118,6 +119,7 @@ def test_fingerprint_changes_with_command_and_directory(tmp_path: Path) -> None:
     assert len({spec_fingerprint(first), spec_fingerprint(other_command), spec_fingerprint(other_dir)}) == 3
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX permission bits do not exist on Windows")
 def test_trust_file_is_private_and_leaves_no_temp_files(tmp_path: Path, launched) -> None:
     workspace = _workspace(tmp_path)
     tool = RunTool(workspace, approver=lambda lines: True)

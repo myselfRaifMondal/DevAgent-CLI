@@ -87,7 +87,10 @@ def test_validation_refuses_symlink_that_points_outside_workspace(tmp_path: Path
     workspace = _git_workspace(tmp_path)
     outside = tmp_path / "outside"
     outside.mkdir()
-    (workspace / "link").symlink_to(outside, target_is_directory=True)
+    try:
+        (workspace / "link").symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("creating symlinks needs extra privileges on this platform")
 
     with pytest.raises(UnsafePatchPathError):
         apply_unified_diff_fallback(NEW_FILE_TEMPLATE.format(path="b/link/planted.txt"), workspace)
