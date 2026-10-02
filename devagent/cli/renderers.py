@@ -25,7 +25,8 @@ from devagent.tools.node_tool import NodePackage
 def workspace_status_table(snapshot: WorkspaceSnapshot):
     table = app_table("Workspace Status")
     table.add_column("Field")
-    table.add_column("Value")
+    # Fold long values (paths, file lists) onto the next line rather than cutting them with an ellipsis.
+    table.add_column("Value", overflow="fold")
     table.add_row("Path", styled_path(str(snapshot.project.path)))
     table.add_row("Project type", ", ".join(snapshot.project.project_types) or "unknown")
     table.add_row("Package files", ", ".join(snapshot.project.package_files) or "none")

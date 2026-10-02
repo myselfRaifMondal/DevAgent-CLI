@@ -172,17 +172,7 @@ class AgentShell:
             f"Project types: {', '.join(snapshot.project.project_types) or 'unknown'}",
             f"Saved run phrases: {len(inventory.profiles)}",
             "",
-            "Modes:",
-            "- AI for provider selection and model discovery",
-            "- Chat for repo-aware Q&A",
-            "- Git for version-control workflows",
-            "- Run for launching services and saved phrases",
-            "- Repo for status, indexing, packages, and inspect",
-            "- Setup for clone/publish/onboarding",
-            "- Edit for diff-first code changes",
-            "- Watch for background file-change suggestions",
-            "",
-            "Quick command can route saved phrases, runtime requests, repo actions, Git requests, and chat.",
+            "Pick a mode below. The menu is the full list; Help explains each one.",
         ]
         return "\n".join(lines)
 
