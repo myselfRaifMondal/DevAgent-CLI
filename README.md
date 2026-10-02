@@ -5,7 +5,10 @@ bind to a workspace, index the codebase, answer repo-aware questions, propose
 diff-first edits, guide common Git flows, launch local services, and let you
 pick which AI provider and models power those workflows.
 
-![DevAgent shell home](docs/assets/shell-home.svg)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/shell-home-light.svg">
+  <img alt="DevAgent shell home" src="docs/assets/shell-home.svg">
+</picture>
 
 ## Why this project exists
 
@@ -85,7 +88,10 @@ unless you pass `--yes`.
 
 That behavior exists to keep AI edits inspectable instead of magical.
 
-![Edit proposal preview](docs/assets/edit-diff-preview.svg)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/edit-diff-preview-light.svg">
+  <img alt="Edit proposal preview" src="docs/assets/edit-diff-preview.svg">
+</picture>
 
 ### Guided Git flows
 
@@ -123,7 +129,10 @@ It can detect providers from the API keys you already have, list visible models
 for those providers, and save a default provider/model choice for chat, edit,
 and related AI-backed features.
 
-![AI status snapshot](docs/assets/ai-status.svg)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/ai-status-light.svg">
+  <img alt="AI status snapshot" src="docs/assets/ai-status.svg">
+</picture>
 
 ## Install with `pipx`
 
@@ -447,6 +456,25 @@ Check:
 - whether `PATH` changed after the terminal host was opened
 - whether provider keys are available in that session
 - whether `pipx` paths are visible in that session
+
+## Terminal display
+
+DevAgent draws with your terminal's own 16-colour ANSI palette instead of fixed colours, so the
+same output is readable on light and dark themes. Status is never shown by colour alone: every
+state has a symbol and a word (`✓ yes`, `▲ 3 changed`, `✗ unavailable`).
+
+- `NO_COLOR=1` turns colour off.
+- `DEVAGENT_ASCII=1` swaps the symbols and box lines for plain ASCII. DevAgent also does this on its
+  own when the output stream is not UTF-8, such as `LANG=C` shells.
+- Long paths wrap instead of being cut, and tables and panels reflow on narrow terminals.
+
+The screenshots above are generated from the real renderers, not drawn by hand. After changing the
+UI, regenerate them so the README never shows a screen the product no longer produces:
+
+```bash
+python scripts/render_screenshots.py          # rewrite docs/assets/*.svg
+python scripts/render_screenshots.py --check  # exit 1 if they are out of date
+```
 
 ## Local development
 

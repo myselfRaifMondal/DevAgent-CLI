@@ -27,14 +27,20 @@ def _workspace(tmp_path: Path) -> Path:
     return workspace
 
 
-def test_the_home_panel_no_longer_repeats_the_menu(tmp_path: Path) -> None:
-    text = AgentShell(_workspace(tmp_path)).welcome_message()
+def _render_home(shell: AgentShell, width: int = 100) -> str:
+    buffer = Console(width=width, record=True, force_terminal=False, color_system=None)
+    with buffer.capture() as capture:
+        buffer.print(shell.welcome_renderable())
+    return capture.get()
 
-    assert "Workspace:" in text
-    assert "Project types:" in text
-    assert "Saved run phrases:" in text
+
+def test_the_home_panel_no_longer_repeats_the_menu(tmp_path: Path) -> None:
+    text = _render_home(AgentShell(_workspace(tmp_path)))
+
+    for label in ("workspace", "git", "stack", "ai", "run"):
+        assert label in text
     assert "Modes:" not in text
-    for line in ("- AI for provider selection", "- Chat for repo-aware", "- Watch for background"):
+    for line in ("AI for provider selection", "Chat for repo-aware", "Watch for background"):
         assert line not in text
 
 
@@ -45,7 +51,7 @@ def test_run_list_prints_the_inventory_without_the_banner(tmp_path: Path) -> Non
 
     assert result.exit_code == 0
     assert "Detected Run Targets" in result.output
-    assert "RUNTIME AGENT" not in result.output
+    assert "Runtime Agent" not in result.output
 
 
 def test_bare_run_keeps_its_landing_banner(tmp_path: Path) -> None:
@@ -54,7 +60,7 @@ def test_bare_run_keeps_its_landing_banner(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run"])
 
     assert result.exit_code == 0
-    assert "RUNTIME AGENT" in result.output
+    assert "Runtime Agent" in result.output
     assert "Detected Run Targets" in result.output
 
 

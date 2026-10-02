@@ -23,7 +23,7 @@ from devagent.cli.renderers import (
     run_launch_message,
     workspace_status_table,
 )
-from devagent.cli.ui import app_panel, app_table, console, hero_panel, render_chat_markdown, status_badge, styled_path, toned_message
+from devagent.cli.ui import app_panel, app_table, console, diff_renderable, hero_panel, render_chat_markdown, status_badge, styled_path, toned_message
 from devagent.config.settings import ConfigManager
 from devagent.core.actions import DevAgentActions, bind_workspace_action, snapshot_workspace
 from devagent.core.shell import AgentShell, git_menu_choices, interactive_terminal
@@ -612,7 +612,7 @@ def edit(
             proposal = actions.edit_propose(instruction, progress_callback=status.update)
     else:
         proposal = actions.edit_propose(instruction)
-    console.print(app_panel(proposal.diff or proposal.message, "Proposed Change", tone="info"))
+    console.print(app_panel(diff_renderable(proposal.diff) if proposal.diff else proposal.message, "Proposed Change", tone="info"))
     if not proposal.diff:
         raise typer.Exit(code=1)
     if yes or typer.confirm("Apply this diff?"):

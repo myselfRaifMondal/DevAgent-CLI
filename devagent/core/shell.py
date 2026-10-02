@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Group, RenderableType
+from rich.text import Text
 from rich.prompt import Confirm, Prompt
 
 from devagent.cli.prompts import MenuChoice, choose_directory, choose_menu_action
@@ -28,7 +29,7 @@ from devagent.cli.renderers import (
     run_launch_message,
     workspace_status_table,
 )
-from devagent.cli.ui import app_panel, console, hero_panel, render_chat_markdown
+from devagent.cli.ui import app_panel, console, diff_renderable, glyph, hero_panel, muted, render_chat_markdown, shorten_path, status_strip, styled_path
 from devagent.core.actions import AISelectionResult, DevAgentActions, PullOutcome, PullRequestPreview, PushOutcome, RunProfile, RunLaunchResult, WorkspaceSnapshot
 from devagent.tools.git_tool import GitError, GitRemote
 
@@ -164,21 +165,44 @@ class AgentShell:
     def run_tool(self):
         return self.actions.run_tool
 
-    def welcome_message(self) -> str:
+    def welcome_renderable(self) -> RenderableType:
+        """The home dashboard: where you are, what state it is in, and what DevAgent can reach."""
         snapshot = self.actions.workspace_status()
         inventory = self.actions.run_inventory()
-        lines = [
-            f"Workspace: {snapshot.project.path}",
-            f"Project types: {', '.join(snapshot.project.project_types) or 'unknown'}",
-            f"Saved run phrases: {len(inventory.profiles)}",
-            "",
-            "Pick a mode below. The menu is the full list; Help explains each one.",
+        ai = self.actions.ai_summary()
+
+        if snapshot.is_repo:
+            git: Text = Text(snapshot.branch or "unknown", style="bold")
+            if snapshot.dirty:
+                git.append(f"  {glyph('warning')} {len(snapshot.changed_files)} changed", style="bold yellow")
+            else:
+                git.append(f"  {glyph('success')} clean", style="bold green")
+        else:
+            git = muted("not a git repository")
+
+        if ai:
+            provider, model = ai
+            ai_value: Text = Text(provider, style="bold")
+            if model:
+                ai_value.append(f" {glyph('sep')} {model}", style="dim")
+        else:
+            ai_value = Text(f"{glyph('warning')} not configured", style="bold yellow")
+            ai_value.append("  run `devagent ai status` for setup", style="dim")
+
+        targets = len(inventory.detected)
+        phrases = len(inventory.profiles)
+        rows = [
+            ("workspace", styled_path(shorten_path(snapshot.project.path, max(24, console.width - 20)))),
+            ("git", git),
+            ("stack", ", ".join(snapshot.project.project_types) or muted("unknown")),
+            ("ai", ai_value),
+            ("run", f"{targets} target{'s' if targets != 1 else ''} {glyph('sep')} {phrases} saved phrase{'s' if phrases != 1 else ''}"),
         ]
-        return "\n".join(lines)
+        return Group(status_strip(rows), Text(""), muted("Pick a mode below. Help explains each one."))
 
     def run(self) -> None:
         console.print(hero_panel("Agent Shell", "One menu-driven control room for chat, Git, runtime, setup, and repo work."))
-        console.print(app_panel(self.welcome_message(), "Workspace Linked", tone="info", expand=False))
+        console.print(app_panel(self.welcome_renderable(), "Workspace linked", tone="success"))
         while True:
             choice = choose_menu_action(console, "DevAgent Home", home_menu_choices())
             if not choice or choice == "exit":
@@ -236,13 +260,13 @@ class AgentShell:
         if result.use_panel:
             console.print(app_panel(result.message, result.title, tone=result.tone, expand=False))
         else:
-            console.print(result.message)
+            console.print(Text(result.message) if isinstance(result.message, str) else result.message)
 
     def chat_mode(self) -> None:
         console.print(app_panel("Chat mode is ready. Ask repo questions, or use /help for shell controls.", "Chat Mode", tone="info", expand=False))
         while True:
             try:
-                user_input = console.input("[bold bright_cyan]chat[/bold bright_cyan] [bright_black]>[/bright_black] ")
+                user_input = console.input(f"[bold cyan]chat[/bold cyan] [dim]{glyph('prompt')}[/dim] ")
             except (EOFError, KeyboardInterrupt):
                 console.print()
                 return
@@ -345,7 +369,7 @@ class AgentShell:
                 return
             with console.status("Thinking...") as status:
                 proposal = self.actions.edit_propose(instruction, progress_callback=status.update)
-            self.display_result(ShellResult("Proposed Change", proposal.diff or proposal.message, "info"))
+            self.display_result(ShellResult("Proposed Change", diff_renderable(proposal.diff) if proposal.diff else proposal.message, "info"))
             if not proposal.diff:
                 continue
             if Confirm.ask("Apply this diff?", default=False):

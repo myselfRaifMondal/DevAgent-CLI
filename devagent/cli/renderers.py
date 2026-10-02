@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Iterable
 
 from rich.console import Group, RenderableType
+from rich.text import Text
 
-from devagent.cli.ui import app_table, status_badge, styled_path, toned_message
+from devagent.cli.ui import app_table, kv_table, muted, status_badge, styled_path, tone_glyph, toned_message
 from devagent.core.actions import (
     AISelectionResult,
     MergeConflictDetail,
@@ -23,18 +24,16 @@ from devagent.tools.node_tool import NodePackage
 
 
 def workspace_status_table(snapshot: WorkspaceSnapshot):
-    table = app_table("Workspace Status")
-    table.add_column("Field")
-    # Fold long values (paths, file lists) onto the next line rather than cutting them with an ellipsis.
-    table.add_column("Value", overflow="fold")
+    # kv_table folds long values (paths, file lists) onto the next line instead of cutting them with an ellipsis.
+    table = kv_table("Workspace Status")
     table.add_row("Path", styled_path(str(snapshot.project.path)))
-    table.add_row("Project type", ", ".join(snapshot.project.project_types) or "unknown")
-    table.add_row("Package files", ", ".join(snapshot.project.package_files) or "none")
+    table.add_row("Project type", ", ".join(snapshot.project.project_types) or muted("unknown"))
+    table.add_row("Package files", ", ".join(snapshot.project.package_files) or muted("none"))
     table.add_row("Git repository", status_badge("yes", "success") if snapshot.is_repo else status_badge("no", "warning"))
     if snapshot.is_repo:
         table.add_row("Branch", toned_message(snapshot.branch or "unknown", "info"))
         table.add_row("Dirty", status_badge("yes", "warning") if snapshot.dirty else status_badge("no", "success"))
-        table.add_row("Changed files", "\n".join(snapshot.changed_files) if snapshot.changed_files else "none")
+        table.add_row("Changed files", "\n".join(snapshot.changed_files) if snapshot.changed_files else muted("none"))
     return table
 
 
@@ -84,7 +83,7 @@ def run_inventory_renderable(workspace: Path, inventory: RunInventory) -> Render
         for spec in inventory.detected:
             detected_table.add_row(spec.name, spec.scope(workspace), spec.display_command)
     else:
-        detected_table.add_row("No launchable services detected", "-", "-")
+        detected_table.add_row(muted("No launchable services detected"), muted("-"), muted("-"))
 
     saved_table = app_table("Saved Run Phrases")
     saved_table.add_column("Phrase")
@@ -94,7 +93,7 @@ def run_inventory_renderable(workspace: Path, inventory: RunInventory) -> Render
         for phrase, profile in inventory.profiles.items():
             saved_table.add_row(phrase, "yes" if profile.open_browser else "no", "\n".join(spec.name for spec in profile.specs))
     else:
-        saved_table.add_row("No saved phrases yet", "-", "-")
+        saved_table.add_row(muted("No saved phrases yet"), muted("-"), muted("-"))
     return Group(detected_table, saved_table)
 
 
@@ -147,31 +146,25 @@ def commit_suggestion_renderable(suggestion: CommitSuggestion) -> RenderableType
 
 
 def git_pull_summary_renderable(result: PullOutcome) -> RenderableType:
-    table = app_table("Pull Summary")
-    table.add_column("Field")
-    table.add_column("Value")
+    table = kv_table("Pull Summary")
     table.add_row("Current branch", result.local_branch)
     table.add_row("Pull from", f"{result.remote}/{result.remote_branch}")
     return table
 
 
 def git_push_summary_renderable(result: PushOutcome) -> RenderableType:
-    table = app_table("Push Summary")
-    table.add_column("Field")
-    table.add_column("Value")
+    table = kv_table("Push Summary")
     table.add_row("Current branch", result.local_branch)
     table.add_row("Push to", f"{result.remote}/{result.remote_branch}")
-    table.add_row("Track this branch", "yes" if result.set_upstream else "already tracked")
+    table.add_row("Track this branch", status_badge("yes", "success") if result.set_upstream else muted("already tracked"))
     return table
 
 
 def pr_preview_renderable(preview: PullRequestPreview) -> RenderableType:
-    table = app_table("Pull Request Preview")
-    table.add_column("Field")
-    table.add_column("Value")
+    table = kv_table("Pull Request Preview")
     if getattr(preview, "summary", None):
         table.add_row("Plan", preview.summary)
-    table.add_row("Ready now", "yes" if getattr(preview, "ready_to_create", True) else "not yet")
+    table.add_row("Ready now", status_badge("yes", "success") if getattr(preview, "ready_to_create", True) else status_badge("not yet", "warning"))
     if getattr(preview, "readiness", None):
         table.add_row("Readiness", "\n".join(f"- {line}" for line in preview.readiness))
     table.add_row("Title", preview.title)
@@ -193,13 +186,11 @@ def git_remotes_renderable(remotes: list[GitRemote]) -> RenderableType:
 
 
 def ai_status_renderable(status: AIStatusSnapshot) -> RenderableType:
-    table = app_table("AI Status")
-    table.add_column("Field")
-    table.add_column("Value")
-    table.add_row("Selected provider", status.selected_provider or "none")
-    table.add_row("Chat model", status.fast_model or "none")
-    table.add_row("Deep model", status.deep_model or "none")
-    table.add_row("Embedding model", status.embedding_model or "none")
+    table = kv_table("AI Status")
+    table.add_row("Selected provider", status.selected_provider or muted("none"))
+    table.add_row("Chat model", status.fast_model or muted("none"))
+    table.add_row("Deep model", status.deep_model or muted("none"))
+    table.add_row("Embedding model", status.embedding_model or muted("none"))
     if status.providers:
         provider_lines = []
         for provider in status.providers:
@@ -214,10 +205,15 @@ def ai_status_renderable(status: AIStatusSnapshot) -> RenderableType:
                     details.append(f"{provider.embedding_models} embed")
             if provider.selected:
                 details.append("selected")
-            provider_lines.append(" | ".join(details))
-        table.add_row("Configured providers", "\n".join(provider_lines))
+            tone = "error" if provider.error else "success"
+            # Only the glyph carries the colour; the details stay in the default foreground.
+            line = Text()
+            line.append(f"{tone_glyph(tone)} ", style="bold red" if provider.error else "bold green")
+            line.append(" | ".join(details), style="red" if provider.error else "")
+            provider_lines.append(line)
+        table.add_row("Configured providers", Text("\n").join(provider_lines))
     else:
-        table.add_row("Configured providers", "none")
+        table.add_row("Configured providers", muted("none"))
     visible_warnings = [
         warning
         for warning in status.warnings

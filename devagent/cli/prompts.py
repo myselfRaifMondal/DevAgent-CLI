@@ -38,10 +38,11 @@ def choose_menu_action(console: Console, title: str, choices: list[MenuChoice]) 
                 use_shortcuts=False,
                 style=questionary.Style(
                     [
-                        ("qmark", "fg:#67e8f9 bold"),
-                        ("pointer", "fg:#c084fc bold"),
-                        ("highlighted", "fg:#67e8f9 bold"),
-                        ("answer", "fg:#34d399 bold"),
+                        # ANSI colour names, so the terminal theme picks readable shades for its background.
+                        ("qmark", "fg:ansicyan bold"),
+                        ("pointer", "fg:ansicyan bold"),
+                        ("highlighted", "fg:ansicyan bold"),
+                        ("answer", "fg:ansigreen bold"),
                     ]
                 ),
             ).ask()

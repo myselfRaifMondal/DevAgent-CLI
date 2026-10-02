@@ -165,7 +165,7 @@ def test_shell_routes_saved_phrase_runtime_and_chat(tmp_path: Path, monkeypatch)
 
     chat_result = shell.handle_input("Explain the login flow")
     assert chat_result is not None
-    assert chat_result.message == "chat:Explain the login flow"
+    assert str(chat_result.message) == "chat:Explain the login flow"
     assert shell.repo_agent.deep_calls == [True]
 
     clear_result = shell.handle_input("/clear")
@@ -496,8 +496,10 @@ def test_ai_models_command_shows_provider_specific_failure_for_broken_provider(m
     result = runner.invoke(app, ["ai", "models", "--provider", "xai"])
 
     assert result.exit_code == 1
-    assert "DevAgent could not load live models" in result.stdout
-    assert "credits or licenses yet" in result.stdout
+    # Panel borders and line wraps depend on width and padding, so compare the words, not the layout.
+    flat = " ".join(result.stdout.replace("│", " ").split())
+    assert "DevAgent could not load live models" in flat
+    assert "credits or licenses yet" in flat
 
 
 def test_ai_use_provider_only_saves_when_discovery_is_unavailable(monkeypatch) -> None:

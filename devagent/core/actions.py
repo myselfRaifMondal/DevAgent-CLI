@@ -166,6 +166,13 @@ class DevAgentActions:
     def clear_chat_session(self) -> None:
         self.repo_agent.clear_session()
 
+    def ai_summary(self) -> tuple[str, str | None] | None:
+        """Selected provider and chat model, from local settings only (no network), or None if unconfigured."""
+        client = AIClient.from_env()
+        if not client.available:
+            return None
+        return client.provider_label, client.selected_model()
+
     def ai_status(self, *, refresh: bool = False) -> AIStatusSnapshot:
         return AIClient.from_env().provider_status(refresh=refresh)
 
