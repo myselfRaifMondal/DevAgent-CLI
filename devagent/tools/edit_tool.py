@@ -7,7 +7,7 @@ from pathlib import Path
 
 from devagent.context.indexer import CodeIndexer
 from devagent.context.retriever import Retriever
-from devagent.tools.ai import AIClient, GenerationProgressCallback
+from devagent.tools.ai import AIClient, GenerationProgressCallback, ai_setup_hint
 
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
 PATCH_START_MARKERS = ("diff --git ", "--- a/", "--- /", "Index: ")
@@ -79,8 +79,8 @@ class EditAgent:
                 instruction=instruction,
                 diff=None,
                 message=(
-                    f"{self.ai.provider_label} is not configured, so I will not invent a patch. "
-                    "Configure an AI provider key and rerun this command.\n\nRelevant files:\n"
+                    f"{self.ai.provider_label} is not configured, so I will not invent a patch.\n"
+                    f"{ai_setup_hint()}\n\nRelevant files:\n"
                     f"{files or 'No relevant files found.'}"
                 ),
             )

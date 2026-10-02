@@ -166,6 +166,9 @@ class DevAgentActions:
     def clear_chat_session(self) -> None:
         self.repo_agent.clear_session()
 
+    def ai_available(self) -> bool:
+        return AIClient.from_env().available
+
     def ai_status(self, *, refresh: bool = False) -> AIStatusSnapshot:
         return AIClient.from_env().provider_status(refresh=refresh)
 

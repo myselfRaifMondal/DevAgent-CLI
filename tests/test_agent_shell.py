@@ -282,6 +282,7 @@ def test_edit_mode_stays_active_after_failed_proposal(tmp_path: Path, monkeypatc
         return type("Proposal", (), {"diff": None, "message": "Still busy. Please try again."})()
 
     shell.actions.edit_propose = fake_propose
+    shell.actions.ai_available = lambda: True
     prompts = iter(["first attempt", ""])
     monkeypatch.setattr("devagent.core.shell.Prompt.ask", lambda *args, **kwargs: next(prompts))
 
@@ -308,6 +309,7 @@ def test_edit_mode_stays_active_after_apply_failure(tmp_path: Path, monkeypatch)
 
     shell.actions.edit_propose = fake_propose
     shell.actions.edit_apply = fake_apply
+    shell.actions.ai_available = lambda: True
     prompts = iter(["first attempt", ""])
     monkeypatch.setattr("devagent.core.shell.Prompt.ask", lambda *args, **kwargs: next(prompts))
     confirms = iter([True])

@@ -8,7 +8,7 @@ from devagent.context.retriever import Retriever
 from devagent.core.project import detect_project
 from devagent.core.session_store import SessionStore
 from devagent.core.structured_answers import answer_structured_question
-from devagent.tools.ai import AIClient, GenerationProgressCallback
+from devagent.tools.ai import AIClient, GenerationProgressCallback, ai_setup_hint
 
 
 class RepoAgent:
@@ -80,6 +80,11 @@ class RepoAgent:
                 return response.text
 
         if not chunks:
+            if not self.ai.available:
+                return (
+                    "I could not find matching code for that question, and no AI provider is available to help "
+                    f"interpret it.\n\n{ai_setup_hint()}"
+                )
             return "I could not find matching code context. Run `devagent index` and try a more specific question."
 
         fallback = build_grounded_fallback(
@@ -89,7 +94,7 @@ class RepoAgent:
             session=session,
             chunks=chunks,
             relevant_files=relevant_files,
-            ai_issue=response.final_error if self.ai.available else None,
+            ai_issue=response.final_error if self.ai.available else ai_setup_hint(),
         )
         self.sessions.append_exchange(question, fallback)
         return fallback

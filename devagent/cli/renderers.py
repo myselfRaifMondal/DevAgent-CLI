@@ -16,7 +16,7 @@ from devagent.core.actions import (
     RunLaunchResult,
     WorkspaceSnapshot,
 )
-from devagent.tools.ai import AIStatusSnapshot, ProviderModelListing
+from devagent.tools.ai import AIStatusSnapshot, ProviderModelListing, ai_setup_hint
 from devagent.tools.git_tool import CommitSuggestion, GitRemote
 from devagent.tools.insights import Finding
 from devagent.tools.node_tool import NodePackage
@@ -217,6 +217,7 @@ def ai_status_renderable(status: AIStatusSnapshot) -> RenderableType:
         table.add_row("Configured providers", "\n".join(provider_lines))
     else:
         table.add_row("Configured providers", "none")
+        table.add_row("Setup", ai_setup_hint())
     visible_warnings = [
         warning
         for warning in status.warnings

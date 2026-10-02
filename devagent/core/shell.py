@@ -30,6 +30,7 @@ from devagent.cli.renderers import (
 )
 from devagent.cli.ui import app_panel, console, hero_panel, render_chat_markdown
 from devagent.core.actions import AISelectionResult, DevAgentActions, PullOutcome, PullRequestPreview, PushOutcome, RunProfile, RunLaunchResult, WorkspaceSnapshot
+from devagent.tools.ai import ai_setup_hint
 from devagent.tools.git_tool import GitError, GitRemote
 
 
@@ -250,6 +251,8 @@ class AgentShell:
 
     def chat_mode(self) -> None:
         console.print(app_panel("Chat mode is ready. Ask repo questions, or use /help for shell controls.", "Chat Mode", tone="info", expand=False))
+        if not self.actions.ai_available():
+            console.print(app_panel(f"Answers will come from keyword search only.\n\n{ai_setup_hint()}", "No AI Provider", tone="warning", expand=False))
         while True:
             try:
                 user_input = console.input("[bold bright_cyan]chat[/bold bright_cyan] [bright_black]>[/bright_black] ")
@@ -348,6 +351,10 @@ class AgentShell:
             self.display_result(result)
 
     def edit_mode(self) -> None:
+        if not self.actions.ai_available():
+            # Say so before asking for an instruction that can only be refused.
+            console.print(app_panel(f"Edit needs an AI provider.\n\n{ai_setup_hint()}", "Edit Mode", tone="warning", expand=False))
+            return
         console.print(app_panel("Describe the edit you want. DevAgent will propose a diff before changing files.", "Edit Mode", tone="info", expand=False))
         while True:
             instruction = Prompt.ask("Edit instruction").strip()

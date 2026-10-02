@@ -10,6 +10,18 @@ import json
 
 from devagent.config.settings import ConfigManager, ProviderModelConfig
 
+PROVIDER_KEY_NAMES = ("GEMINI_API_KEY", "GROQ_API_KEY", "XAI_API_KEY", "OPENROUTER_API_KEY")
+
+
+def ai_setup_hint() -> str:
+    """What to tell someone who has not configured a provider yet. One wording, used everywhere."""
+    names = ", ".join(PROVIDER_KEY_NAMES[:-1]) + f" or {PROVIDER_KEY_NAMES[-1]}"
+    return (
+        f"No AI provider is configured. Set {names} in your environment, then run `devagent ai status` "
+        'to check it. The README section "API keys and AI setup" has the details.'
+    )
+
+
 GENERATION_CAPABILITY = "generate"
 EMBED_CAPABILITY = "embed"
 PROVIDER_ORDER = ("gemini", "groq", "xai", "openrouter")
