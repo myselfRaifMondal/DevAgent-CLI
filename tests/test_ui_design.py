@@ -47,7 +47,7 @@ def _scenes():
         workspace_status_table(snapshot),
         ai_status_renderable(status),
         pr_preview_renderable(preview),
-        ui.diff_renderable("--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n"),
+        ui.diff_renderable("--- a/x\n+++ b/x\n@@ -1 +1 @@\n context line\n-old\n+new\n"),
         ui.status_badge("yes", "success"),
     ]
 
@@ -153,6 +153,19 @@ def test_nothing_overflows_the_terminal_width(width: int) -> None:
         with buffer.capture() as capture:
             buffer.print(scene)
         assert max(len(line) for line in capture.get().splitlines()) <= width
+
+
+def test_long_plain_values_in_key_value_tables_fold_instead_of_being_cut() -> None:
+    # A plain string has no overflow setting of its own, so this exercises the column's.
+    table = ui.kv_table("Details")
+    table.add_row("Files", "src/" + "very-long-directory-name/" * 4 + "module.py")
+    buffer = Console(file=io.StringIO(), width=34, force_terminal=False, color_system=None)
+    with buffer.capture() as capture:
+        buffer.print(table)
+    rendered = capture.get()
+
+    assert "…" not in rendered
+    assert "module.py" in "".join(rendered.split())
 
 
 def test_markup_in_messages_is_shown_literally_not_interpreted() -> None:
