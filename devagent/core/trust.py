@@ -88,11 +88,11 @@ class TrustStore:
     def trust(self, specs: Iterable[_SpecLike]) -> None:
         approved = self._load() | {spec_fingerprint(spec) for spec in specs}
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # mkstemp creates the file readable and writable by this user only (0600).
         fd, temp_name = tempfile.mkstemp(dir=self.path.parent, prefix=".trust-", suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 json.dump({"approved": sorted(approved)}, handle, indent=2)
-            os.chmod(temp_name, 0o600)
             os.replace(temp_name, self.path)
         except BaseException:
             Path(temp_name).unlink(missing_ok=True)

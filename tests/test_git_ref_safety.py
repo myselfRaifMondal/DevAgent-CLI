@@ -97,6 +97,15 @@ def test_create_branch_refuses_an_option_and_changes_nothing(tmp_path: Path) -> 
     assert _branches(tmp_path) == before
 
 
+def test_create_branch_never_invokes_git_for_an_unsafe_name(tmp_path: Path, monkeypatch) -> None:
+    # git rejects "--orphan" on its own, which would mask a missing check; assert it is never asked.
+    tool = _repo(tmp_path)
+    monkeypatch.setattr(tool, "_run", lambda *a, **k: pytest.fail("git must not be invoked for an unsafe name"))
+
+    with pytest.raises(GitError):
+        tool.create_branch("--orphan")
+
+
 def test_switch_branch_refuses_an_option_and_never_runs_git(tmp_path: Path, monkeypatch) -> None:
     tool = _repo(tmp_path)
     monkeypatch.setattr(tool, "_run", lambda *a, **k: pytest.fail("git must not be invoked for an unsafe name"))
